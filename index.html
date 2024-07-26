@@ -1,0 +1,243 @@
+<html>
+    <script src='https://d3js.org/d3.v5.min.js'></script>
+    <script src="d3-annotation.js"></script>
+    <body onload="init()">
+        <svg></svg>
+        <svg id="demo"></svg>
+        <style> button { position: absolute }</style>
+        <button id="previous">Prev</button>
+        <button id="next">Next</button>
+        <button id="demoButton">Averages</button>
+        <style> #next {top:480; left: 1272} </style>
+        <style> #previous {top: 480; left: 1225}</style>
+        <style> #demoButton {top: 480; left: 1150}</style>
+        <svg></svg>
+        <svg id="demo"></svg>
+        <style> svg {position: absolute; top: 0; left: 0}</style>
+        <style> #demo {top: 500; left: 50}</style>
+        <script>
+            //For keeping track of what chart we need to load
+            //parameter to figure out what chart to display
+            let i = 0;
+            //paratmeter to tell if averages chart should be visible or not
+            let k = 0;
+            async function init() {
+                chart_cases();
+            }
+            async function chart_cases() {
+                console.log("loading file");
+                //grab data
+                var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
+                console.log("file loaded");
+                //get our data points
+                data.forEach(d => {
+                    d.date = new Date(d.date);
+                    d.cases = +d.cases;
+                });
+                data = data.filter(function(d) {
+                    return (d.cases > -1);
+                });
+                //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
+                //dimensions
+                const margin = {top: 70, right: 30, bottom: 40, left: 80};
+                const width = 1200 - margin.left - margin.right;
+                const height = 500 - margin.top - margin.bottom;
+                //x and y scales
+                const x = d3.scaleTime().range([0, width]);
+                const y = d3.scaleLinear().range([height, 0]);
+                //modify our svg element
+                const svg = d3.select("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", "translate(80,70)");
+                //define our x and y domains
+                x.domain(d3.extent(data, d=>d.date));
+                y.domain([0, d3.max(data, d=>d.cases)]);
+                svg.append("g").attr("transform", "translate(0,390)").call(d3.axisBottom(x).ticks(d3.timeMonth.every(4)).tickFormat(d3.timeFormat("%b %Y")));
+                svg.append("g").call(d3.axisLeft(y));
+                //praying this axis label works
+                svg.append("text").text("New Cases").attr("transform", "translate(-30, -15)");
+                //Chart name
+                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID Daily New Cases");
+                //line time!
+                const line = d3.line().x(d => x(d.date)).y(d => y(d.cases));
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "steelblue").attr("stroke-width", 1).attr("d", line);
+                //d3.select("#demo").style("display", "none");
+                const type = d3.annotationLabel
+                const annotations = [{
+                    note: {
+                        label: "Longer text to show wrapping",
+                        bgPadding: 20,
+                        title: "Annotations :)"
+                    }
+                }]
+                const makeAnnotations = d3.annotation().editMode(true).notePadding(15).type(type).annotations(annotations);
+                d3.select("svg").append("g").attr("class", "annotation-group").call(makeAnnotations)
+            }
+            d3.select("#next").on("click", function() {
+                //handle if we are at max
+                if (i === 1) {
+                    return
+                }
+                d3.select("svg").selectAll('*').remove();
+                d3.select("#demo").selectAll('*').remove();
+                k = 0;
+                if (i === 0) {
+                    chart_deaths();
+                }
+                i = i + 1;
+            });
+            d3.select('#previous').on("click", function() {
+                //handle if we are at first
+                if (i === 0) {
+                    return
+                };
+                d3.select("svg").selectAll('*').remove();
+                d3.select("#demo").selectAll('*').remove();
+                k = 0;
+                if (i === 1) {
+                    chart_cases();
+                }
+                i = i - 1;
+            })
+            async function chart_deaths() {
+                console.log("loading file");
+                //grab data
+                var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
+                console.log("file loaded");
+                //get our data points
+                data.forEach(d => {
+                    d.date = new Date(d.date);
+                    d.deaths = +d.deaths;
+                });
+                data = data.filter(function(d) {
+                    return (d.deaths > -1) && (d.deaths < 12000);
+                })
+                //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
+                //dimensions
+                const margin = {top: 70, right: 30, bottom: 40, left: 80};
+                const width = 1200 - margin.left - margin.right;
+                const height = 500 - margin.top - margin.bottom;
+                //x and y scales
+                const x = d3.scaleTime().range([0, width]);
+                const y = d3.scaleLinear().range([height, 0]);
+                //modify our svg element
+                const svg = d3.select("svg").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", "translate(80,70)");
+                //define our x and y domains
+                x.domain(d3.extent(data, d=>d.date));
+                y.domain([0, d3.max(data, d=>d.deaths)]);
+                svg.append("g").attr("transform", "translate(0,390)").call(d3.axisBottom(x).ticks(d3.timeMonth.every(4)).tickFormat(d3.timeFormat("%b %Y")));
+                svg.append("g").call(d3.axisLeft(y));
+                //praying this axis label works
+                svg.append("text").text("Deaths Reported").attr("transform", "translate(-30, -15)");
+                //Chart name
+                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID Deaths Reported Daily");
+                //line time!
+                const line = d3.line().x(d => x(d.date)).y(d => y(d.deaths))
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "red").attr("stroke-width", 1).attr("d", line);
+                //d3.select("#demo").style("display", "none");
+                const type = d3.annotationLabel
+                const annotations = [{
+                    note: {
+                        label: "Longer text to show wrapping",
+                        bgPadding: 20,
+                        title: "Annotations :)"
+                    }
+                }]
+                const makeAnnotations = d3.annotation().editMode(true).notePadding(15).type(type).annotations(annotations);
+                d3.select("svg").append("g").attr("class", "annotation-group").call(makeAnnotations)                
+            }
+            async function cases_average() {
+                console.log("loading file");
+                //grab data
+                var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
+                console.log("file loaded");
+                //get our data points
+                data.forEach(d => {
+                    d.date = new Date(d.date);
+                    d.cases_avg = +d.cases_avg;
+                });
+                data = data.filter(function(d) {
+                    return (d.cases_avg > -1);
+                })
+                //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
+                //dimensions
+                const margin = {top: 35, right: 15, bottom: 20, left: 40};
+                const width = 600 - margin.left - margin.right;
+                const height = 250 - margin.top - margin.bottom;
+                //x and y scales
+                const x = d3.scaleTime().range([0, width]);
+                const y = d3.scaleLinear().range([height, 0]);
+                //modify our svg element
+                const svg = d3.select("#demo").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", "translate(60,35)");
+                //define our x and y domains
+                x.domain(d3.extent(data, d=>d.date));
+                y.domain([0, d3.max(data, d=>d.cases_avg)]);
+                svg.append("g").attr("transform", "translate(0,195)").call(d3.axisBottom(x).ticks(d3.timeMonth.every(4)).tickFormat(d3.timeFormat("%b %Y")));
+                svg.append("g").call(d3.axisLeft(y));
+                //praying this axis label works
+                svg.append("text").text("Last 7 Day Average").attr("transform", "translate(-30, -15)");
+                //Chart name
+                svg.append("text").attr("x", margin.left + 150).attr("y", margin.top - 50).style("font-size", "17px").style("font-weight", "bold").text("Cases 7 Day Rolling Average");
+                //line time!
+                const line = d3.line().x(d => x(d.date)).y(d => y(d.cases_avg))
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
+                //d3.select("#demo").style("display", "none");
+            }
+            async function deaths_average() {
+                console.log("loading file");
+                //grab data
+                var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
+                console.log("file loaded");
+                //get our data points
+                data.forEach(d => {
+                    d.date = new Date(d.date);
+                    d.deaths_avg = +d.deaths_avg;
+                });
+                data = data.filter(function(d) {
+                    return (d.deaths_avg > -1);
+                })
+                //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
+                //dimensions
+                const margin = {top: 35, right: 15, bottom: 20, left: 40};
+                const width = 600 - margin.left - margin.right;
+                const height = 250 - margin.top - margin.bottom;
+                //x and y scales
+                const x = d3.scaleTime().range([0, width]);
+                const y = d3.scaleLinear().range([height, 0]);
+                //modify our svg element
+                const svg = d3.select("#demo").attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g").attr("transform", "translate(60,35)");
+                //define our x and y domains
+                x.domain(d3.extent(data, d=>d.date));
+                y.domain([0, d3.max(data, d=>d.deaths_avg)]);
+                svg.append("g").attr("transform", "translate(0,195)").call(d3.axisBottom(x).ticks(d3.timeMonth.every(4)).tickFormat(d3.timeFormat("%b %Y")));
+                svg.append("g").call(d3.axisLeft(y));
+                //praying this axis label works
+                svg.append("text").text("Last 7 Day Average").attr("transform", "translate(-30, -15)");
+                //Chart name
+                svg.append("text").attr("x", margin.left + 150).attr("y", margin.top - 50).style("font-size", "17px").style("font-weight", "bold").text("Deaths 7 Day Rolling Average");
+                //line time!
+                const line = d3.line().x(d => x(d.date)).y(d => y(d.deaths_avg))
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
+                //d3.select("#demo").style("display", "none");
+            }
+            d3.select("#demoButton").on("click", function() {
+                if (i === 0) {
+                    if (k === 0) {
+                        cases_average();
+                        k = 1;
+                    } else {
+                        d3.select("#demo").selectAll('*').remove();
+                        k = 0
+                    }
+                }
+                if (i === 1) {
+                    if (k === 0) {
+                        deaths_average();
+                        k = 1;
+                    } else {
+                        d3.select("#demo").selectAll('*').remove();
+                        k = 0
+                    }
+                }
+            })
+        </script>
+    </body>
+</html>
