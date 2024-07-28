@@ -13,16 +13,24 @@
         <style> #previous {top: 480; left: 1225}</style>
         <style> #demoButton {top: 480; left: 1150}</style>
         <style> #min {top: 10; left: 1250}</style>
+        <p id="tooltip">Mouse over the charts for a tooltip!<p>
+        <p id="sources">[1] “CDC Museum Covid-19 Timeline,” Centers for Disease Control and Prevention,<br>https://www.cdc.gov/museum/timeline/covid19.html (accessed Jul. 28, 2024).<br>Data: https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv</p>
+        <style> #tooltip {position: absolute; top: 725; left: 450; font-size: 34px;}</style>
+        <style> #sources {position: absolute; top: 800; left: 450; font-size: 12px}</style>
         <svg></svg>
         <svg id="demo"></svg>
         <style> svg {position: absolute; top: 0; left: 0}</style>
         <style> #demo {top: 500; left: 50}</style>
+        <style>
+            rect { pointer-events: all; fill-opacity: 0; stroke-opacity: 0; z-index: 1;} .tooltip {position: absolute; padding: 10px; background-color: steelblue; color: white; border: 1px solid white; border-radius: 10px; display: none; opacity: .75;}
+        </style>
         <script>
             //For keeping track of what chart we need to load
             //parameter to figure out what chart to display
             let i = 0;
             //paratmeter to tell if averages chart should be visible or not
             let k = 0
+            //the minimum value our datapoints must reach
             let min = 0;
             async function init() {
                 chart_cases(min);
@@ -58,26 +66,85 @@
                 //praying this axis label works
                 svg.append("text").text("New Cases").attr("transform", "translate(-30, -15)");
                 //Chart name
-                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID Daily New Cases");
+                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID US Daily Reported Cases");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.cases));
                 svg.append("path").datum(data).attr("fill", "none").attr("stroke", "steelblue").attr("stroke-width", 1).attr("d", line);
-                //d3.select("#demo").style("display", "none");
-                const type = d3.annotationLabel
-                const annotations = [{
-                    note: {
-                        label: "Longer text to show wrapping",
-                        bgPadding: 20,
-                        title: "Annotations :)"
-                    }
-                }]
-                const makeAnnotations = d3.annotation().editMode(true).notePadding(15).type(type).annotations(annotations);
-                d3.select("svg").append("g").attr("class", "annotation-group").call(makeAnnotations)
+                //tooltip functionality: https://www.youtube.com/watch?v=uyPYxx-WGxc
+                const tooltip = d3.select('body').append('div').attr('class', "tooltip").attr('id', 'main_tool');
+                const circle = svg.append('circle').attr("r", 0).attr('fill', 'steelblue').style("stroke","white").attr("opacity", .70).style("pointer-events", "none");
+                const listeningRect = svg.append("rect").attr("width", width).attr("height", height);
+                //not sure how this works being in a function
+                listeningRect.on("mousemove", function () {
+                    const [xCoord, yCoord] = d3.mouse(this);
+                    const bisectDate = d3.bisector(d=>d.date).left;
+                    const x0 = x.invert(xCoord);
+                    const i = bisectDate(data, x0, 1);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                    const xPos = x(d.date);
+                    const yPos = y(d.cases);
+                    circle.attr("cx", xPos).attr("cy", yPos);
+                    console.log(xPos)
+                    circle.transition().duration(50).attr("r", 5);
+                    tooltip.style("display", "block").style("left", '' + (xPos + 100) + 'px').style("top", '' + (yPos + 50) + 'px').html('<strong>Date:</strong>' + d.date.toLocaleDateString() + '<br><strong>Cases:</strong>' + (d.cases !== undefined ? (d.cases).toFixed(0) : 'N/A'))
+                });
+                listeningRect.on("mouseleave", function () {
+                    circle.transition().duration(50).attr('r', 0);
+                    tooltip.style('display', 'none');
+                })
+                //guide on how to use d3 annotations: https://d3-annotation.susielu.com/
+                if (min < 120000) {
+                    const annotations = [
+                        {
+                            note: { label: "First wave of covid hits the United States [1]", title: "March 2020" },
+                            data: { date: new Date('03/24/2020'), cases: 14000 },
+                            dy: -175,
+                            dx: 0,
+                        },
+                        {
+                            note: { label: "Significant spike in daily reported cases begins [1]", title: "December 20, 2021" },
+                            data: { date: new Date('12/20/2021'), cases: 189471 },
+                            dy: -100,
+                            dx: -50,
+                        },
+                        {
+                            note: {label: "FDA grants emergency use authorization for the Pfizer vaccine [1]", title: "December 11, 2020"},
+                            data: {date: new Date('12/11/2020'), cases: 280000 },
+                            dy: -100,
+                            dx: 0,
+                        },
+                        {
+                            note: {label: "First case of Omicron variant was detected [1]", title: "December 1, 2021"},
+                            data: {date: new Date('12/01/2021'), cases: 138700},
+                            dy: -100,
+                            dx: -150,
+                        }
+                    ];
+                    const makeAnnotations = d3.annotation()
+                        .type(d3.annotationLabel)
+                        .accessors({
+                            x: d => x(d.date),
+                            y: d => y(d.cases)
+                        })
+                        .accessorsInverse({
+                            date: d => x.invert(d.x),
+                            cases: d => y.invert(d.y)
+                        })
+                        .annotations(annotations);
+
+                    svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
+                }
             }
             d3.select("#next").on("click", function() {
                 //handle if we are at max
                 if (i === 2) {
                     return
+                }
+                d3.select('body').select('#main_tool').remove();
+                if (k === 1) {
+                    d3.select('body').select('#avg_tool').remove();
                 }
                 d3.select("svg").selectAll('*').remove();
                 d3.select("#demo").selectAll('*').remove();
@@ -97,6 +164,10 @@
                     return
                 };
                 min = 0;
+                d3.select('body').select('#main_tool').remove();
+                if (k === 1) {
+                    d3.select('body').select('#avg_tool').remove();
+                }
                 d3.select("svg").selectAll('*').remove();
                 d3.select("#demo").selectAll('*').remove();
                 k = 0;
@@ -139,21 +210,71 @@
                 //praying this axis label works
                 svg.append("text").text("Deaths Reported").attr("transform", "translate(-30, -15)");
                 //Chart name
-                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID Deaths Reported Daily");
+                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID US Daily Reported Deaths");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.deaths))
                 svg.append("path").datum(data).attr("fill", "none").attr("stroke", "red").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
-                const type = d3.annotationLabel
-                const annotations = [{
-                    note: {
-                        label: "Longer text to show wrapping",
-                        bgPadding: 20,
-                        title: "Annotations :)"
-                    }
-                }]
-                const makeAnnotations = d3.annotation().editMode(true).notePadding(15).type(type).annotations(annotations);
-                d3.select("svg").append("g").attr("class", "annotation-group").call(makeAnnotations)                
+                //tooltip functionality: https://www.youtube.com/watch?v=uyPYxx-WGxc
+                const tooltip = d3.select('body').append('div').attr('class', "tooltip").attr('id', 'main_tool').style("background-color", "red");
+                const circle = svg.append('circle').attr("r", 0).attr('fill', 'red').style("stroke","white").attr("opacity", .70).style("pointer-events", "none");
+                const listeningRect = svg.append("rect").attr("width", width).attr("height", height);
+                //not sure how this works being in a function
+                listeningRect.on("mousemove", function () {
+                    const [xCoord, yCoord] = d3.mouse(this);
+                    const bisectDate = d3.bisector(d=>d.date).left;
+                    const x0 = x.invert(xCoord);
+                    const i = bisectDate(data, x0, 1);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                    const xPos = x(d.date);
+                    const yPos = y(d.deaths);
+                    circle.attr("cx", xPos).attr("cy", yPos);
+                    console.log(xPos)
+                    circle.transition().duration(50).attr("r", 5);
+                    tooltip.style("display", "block").style("left", '' + (xPos + 100) + 'px').style("top", '' + (yPos + 50) + 'px').html('<strong>Date:</strong>' + d.date.toLocaleDateString() + '<br><strong>Deaths:</strong>' + (d.deaths !== undefined ? (d.deaths).toFixed(0) : 'N/A'))
+                });
+                listeningRect.on("mouseleave", function () {
+                    circle.transition().duration(50).attr('r', 0);
+                    tooltip.style('display', 'none');
+                })    
+                //guide on how to use d3 annotations: https://d3-annotation.susielu.com/
+                if (min < 200) {
+                    const annotations = [
+                        {
+                            note: { label: "First wave of covid hits the United States [1]", title: "March 2020" },
+                            data: { date: new Date('03/24/2020'), deaths: 260 },
+                            dy: -175,
+                            dx: 50,
+                        },
+                        {
+                            note: {label: "Winter surge begins [1]", title: "November 2020"},
+                            data: {date: new Date('11/01/2020'), deaths: 1000 },
+                            dy: -100,
+                            dx: -50,
+                        },
+                        {
+                            note: {label: "First case of Omicron variant was detected [1]", title: "December 1, 2021"},
+                            data: {date: new Date('12/01/2021'), deaths: 2000},
+                            dy: -150,
+                            dx: -0,
+                        }
+                    ];
+                    const makeAnnotations = d3.annotation()
+                        .type(d3.annotationLabel)
+                        .accessors({
+                            x: d => x(d.date),
+                            y: d => y(d.deaths)
+                        })
+                        .accessorsInverse({
+                            date: d => x.invert(d.x),
+                            cases: d => y.invert(d.y)
+                        })
+                        .annotations(annotations);
+
+                    svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
+                }
             }
             async function cases_average() {
                 console.log("loading file");
@@ -191,6 +312,30 @@
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.cases_avg))
                 svg.append("path").datum(data).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
+                //tooltip functionality: https://www.youtube.com/watch?v=uyPYxx-WGxc
+                const tooltip = d3.select('body').append('div').attr('class', "tooltip").attr('id', 'avg_tool').style("background-color", "green");
+                const circle = svg.append('circle').attr("r", 0).attr('fill', 'green').style("stroke","white").attr("opacity", .70).style("pointer-events", "none");
+                const listeningRect = svg.append("rect").attr("width", width).attr("height", height);
+                //not sure how this works being in a function
+                listeningRect.on("mousemove", function () {
+                    const [xCoord, yCoord] = d3.mouse(this);
+                    const bisectDate = d3.bisector(d=>d.date).left;
+                    const x0 = x.invert(xCoord);
+                    const i = bisectDate(data, x0, 1);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                    const xPos = x(d.date);
+                    const yPos = y(d.cases_avg);
+                    circle.attr("cx", xPos).attr("cy", yPos);
+                    console.log(xPos)
+                    circle.transition().duration(50).attr("r", 5);
+                    tooltip.style("display", "block").style("left", '' + (xPos + 125) + 'px').style("top", '' + (yPos + 500) + 'px').html('<strong>Date:</strong>' + d.date.toLocaleDateString() + '<br><strong>Average Cases:</strong>' + (d.cases_avg !== undefined ? (d.cases_avg).toFixed(0) : 'N/A'))
+                });
+                listeningRect.on("mouseleave", function () {
+                    circle.transition().duration(50).attr('r', 0);
+                    tooltip.style('display', 'none');
+                })
             }
             async function deaths_average() {
                 console.log("loading file");
@@ -228,6 +373,30 @@
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.deaths_avg))
                 svg.append("path").datum(data).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
+                //tooltip functionality: https://www.youtube.com/watch?v=uyPYxx-WGxc
+                const tooltip = d3.select('body').append('div').attr('class', "tooltip").attr('id', 'avg_tool').style("background-color", "green");
+                const circle = svg.append('circle').attr("r", 0).attr('fill', 'green').style("stroke","white").attr("opacity", .70).style("pointer-events", "none");
+                const listeningRect = svg.append("rect").attr("width", width).attr("height", height);
+                //not sure how this works being in a function
+                listeningRect.on("mousemove", function () {
+                    const [xCoord, yCoord] = d3.mouse(this);
+                    const bisectDate = d3.bisector(d=>d.date).left;
+                    const x0 = x.invert(xCoord);
+                    const i = bisectDate(data, x0, 1);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                    const xPos = x(d.date);
+                    const yPos = y(d.deaths_avg);
+                    circle.attr("cx", xPos).attr("cy", yPos);
+                    console.log(xPos)
+                    circle.transition().duration(50).attr("r", 5);
+                    tooltip.style("display", "block").style("left", '' + (xPos + 125) + 'px').style("top", '' + (yPos + 500) + 'px').html('<strong>Date:</strong>' + d.date.toLocaleDateString() + '<br><strong>Average Deaths:</strong>' + (d.deaths_avg !== undefined ? (d.deaths_avg).toFixed(0) : 'N/A'))
+                });
+                listeningRect.on("mouseleave", function () {
+                    circle.transition().duration(50).attr('r', 0);
+                    tooltip.style('display', 'none');
+                })
             }
             async function cases_deaths_ratio(min) {
                 console.log("loading file");
@@ -244,7 +413,7 @@
                     }
                 });
                 data = data.filter(function(d) {
-                    return ((d.deaths > min) && (d.deaths < 12000)) && (d.cases > min);
+                    return ((d.deaths > 0) && (d.deaths < 12000)) && (d.cases > 0) && (d.ratio > min);
                 })
                 //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
                 //dimensions
@@ -264,21 +433,71 @@
                 //praying this axis label works
                 svg.append("text").text("Cases per Death Reported").attr("transform", "translate(-30, -15)");
                 //Chart name
-                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID Cases to Deaths Ratio Daily");
+                svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID US Daily Cases per Death");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.ratio))
                 svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
-                const type = d3.annotationLabel
-                const annotations = [{
-                    note: {
-                        label: "Longer text to show wrapping",
-                        bgPadding: 20,
-                        title: "Annotations :)"
-                    }
-                }]
-                const makeAnnotations = d3.annotation().editMode(true).notePadding(15).type(type).annotations(annotations);
-                d3.select("svg").append("g").attr("class", "annotation-group").call(makeAnnotations);
+                //tooltip functionality: https://www.youtube.com/watch?v=uyPYxx-WGxc
+                const tooltip = d3.select('body').append('div').attr('class', "tooltip").attr('id', 'main_tool').style('background-color', 'purple');
+                const circle = svg.append('circle').attr("r", 0).attr('fill', 'purple').style("stroke","white").attr("opacity", .70).style("pointer-events", "none");
+                const listeningRect = svg.append("rect").attr("width", width).attr("height", height);
+                //not sure how this works being in a function
+                listeningRect.on("mousemove", function () {
+                    const [xCoord, yCoord] = d3.mouse(this);
+                    const bisectDate = d3.bisector(d=>d.date).left;
+                    const x0 = x.invert(xCoord);
+                    const i = bisectDate(data, x0, 1);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                    const xPos = x(d.date);
+                    const yPos = y(d.ratio);
+                    circle.attr("cx", xPos).attr("cy", yPos);
+                    console.log(xPos)
+                    circle.transition().duration(50).attr("r", 5);
+                    tooltip.style("display", "block").style("left", '' + (xPos + 100) + 'px').style("top", '' + (yPos + 50) + 'px').html('<strong>Date:</strong>' + d.date.toLocaleDateString() + '<br><strong>Cases per Death:</strong>' + (d.ratio !== undefined ? (d.ratio).toFixed(0) : 'N/A'))
+                });
+                listeningRect.on("mouseleave", function () {
+                    circle.transition().duration(50).attr('r', 0);
+                    tooltip.style('display', 'none');
+                })
+                //guide on how to use d3 annotations: https://d3-annotation.susielu.com/
+                if (min < 20) {
+                    const annotations = [
+                        {
+                            note: { label: "First wave of covid hits the United States [1]", title: "March 2020" },
+                            data: { date: new Date('03/24/2020'), ratio: 34 },
+                            dy: -175,
+                            dx: 50,
+                        },
+                        {
+                            note: {label: "Despite a significant spike in cases, the number of deaths has not grown proportionally", title: "January 1, 2022"},
+                            data: {date: new Date('01/01/2022'), ratio: 287 },
+                            dy: -100,
+                            dx: 100,
+                        },
+                        {
+                            note: {label: "First case of Omicron variant was detected [1]", title: "December 1, 2021"},
+                            data: {date: new Date('12/01/2021'), ratio: 71},
+                            dy: -150,
+                            dx: -0,
+                        }
+                    ];
+                    const makeAnnotations = d3.annotation()
+                        .type(d3.annotationLabel)
+                        .accessors({
+                            x: d => x(d.date),
+                            y: d => y(d.ratio)
+                        })
+                        .accessorsInverse({
+                            date: d => x.invert(d.x),
+                            cases: d => y.invert(d.y)
+                        })
+                        .annotations(annotations);
+
+                    svg.append("g").attr("class", "annotation-group").call(makeAnnotations);
+                }
             }
             async function cases_deaths_ratio_avg() {
                 console.log("loading file");
@@ -320,6 +539,30 @@
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.cases_deaths_avg))
                 svg.append("path").datum(data).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
+                //tooltip functionality: https://www.youtube.com/watch?v=uyPYxx-WGxc
+                const tooltip = d3.select('body').append('div').attr('class', "tooltip").attr('id', 'avg_tool').style("background-color", "green");
+                const circle = svg.append('circle').attr("r", 0).attr('fill', 'green').style("stroke","white").attr("opacity", .70).style("pointer-events", "none");
+                const listeningRect = svg.append("rect").attr("width", width).attr("height", height);
+                //not sure how this works being in a function
+                listeningRect.on("mousemove", function () {
+                    const [xCoord, yCoord] = d3.mouse(this);
+                    const bisectDate = d3.bisector(d=>d.date).left;
+                    const x0 = x.invert(xCoord);
+                    const i = bisectDate(data, x0, 1);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                    const xPos = x(d.date);
+                    const yPos = y(d.cases_deaths_avg);
+                    circle.attr("cx", xPos).attr("cy", yPos);
+                    console.log(xPos)
+                    circle.transition().duration(50).attr("r", 5);
+                    tooltip.style("display", "block").style("left", '' + (xPos + 125) + 'px').style("top", '' + (yPos + 500) + 'px').html('<strong>Date:</strong>' + d.date.toLocaleDateString() + '<br><strong>Average Cases per Death:</strong>' + (d.cases_deaths_avg !== undefined ? (d.cases_deaths_avg).toFixed(0) : 'N/A'))
+                });
+                listeningRect.on("mouseleave", function () {
+                    circle.transition().duration(50).attr('r', 0);
+                    tooltip.style('display', 'none');
+                })
             }
             d3.select("#demoButton").on("click", function() {
                 if (i === 0) {
@@ -328,6 +571,7 @@
                         k = 1;
                     } else {
                         d3.select("#demo").selectAll('*').remove();
+                        d3.select('body').select('#avg_tool').remove();
                         k = 0
                     }
                 }
@@ -337,6 +581,7 @@
                         k = 1;
                     } else {
                         d3.select("#demo").selectAll('*').remove();
+                        d3.select('body').select('#avg_tool').remove();
                         k = 0
                     }
                 }
@@ -346,6 +591,7 @@
                         k = 1;
                     } else {
                         d3.select('#demo').selectAll('*').remove();
+                        d3.select('body').select('#avg_tool').remove();
                         k = 0;
                     }
                 }
@@ -365,6 +611,7 @@
                     }
                 }
                 min = test;
+                d3.select("body").select('#main_tool').remove();
                 d3.select("svg").selectAll('*').remove();
                 if (i === 0) {
                     chart_cases(min);
@@ -376,6 +623,7 @@
                     cases_deaths_ratio(min);
                 }
             })
+
         </script>
     </body>
 </html>
