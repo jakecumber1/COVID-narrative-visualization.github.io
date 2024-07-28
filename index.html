@@ -5,12 +5,14 @@
         <svg></svg>
         <svg id="demo"></svg>
         <style> button { position: absolute }</style>
+        <button id="min">Set minimum</button>
         <button id="previous">Prev</button>
         <button id="next">Next</button>
         <button id="demoButton">Averages</button>
         <style> #next {top:480; left: 1272} </style>
         <style> #previous {top: 480; left: 1225}</style>
         <style> #demoButton {top: 480; left: 1150}</style>
+        <style> #min {top: 10; left: 1250}</style>
         <svg></svg>
         <svg id="demo"></svg>
         <style> svg {position: absolute; top: 0; left: 0}</style>
@@ -21,11 +23,11 @@
             let i = 0;
             //paratmeter to tell if averages chart should be visible or not
             let k = 0
-
+            let min = 0;
             async function init() {
-                chart_cases();
+                chart_cases(min);
             }
-            async function chart_cases() {
+            async function chart_cases(min) {
                 console.log("loading file");
                 //grab data
                 var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
@@ -36,7 +38,7 @@
                     d.cases = +d.cases;
                 });
                 data = data.filter(function(d) {
-                    return (d.cases > -1);
+                    return (d.cases > min);
                 });
                 //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
                 //dimensions
@@ -79,12 +81,13 @@
                 }
                 d3.select("svg").selectAll('*').remove();
                 d3.select("#demo").selectAll('*').remove();
+                min = 0;
                 k = 0;
                 if (i === 0) {
-                    chart_deaths();
+                    chart_deaths(min);
                 }
                 if (i === 1) {
-                    cases_deaths_ratio();
+                    cases_deaths_ratio(min);
                 }
                 i = i + 1;
             });
@@ -93,18 +96,19 @@
                 if (i === 0) {
                     return
                 };
+                min = 0;
                 d3.select("svg").selectAll('*').remove();
                 d3.select("#demo").selectAll('*').remove();
                 k = 0;
                 if (i === 1) {
-                    chart_cases();
+                    chart_cases(min);
                 }
                 if (i === 2) {
-                    chart_deaths();
+                    chart_deaths(min);
                 }
                 i = i - 1;
             })
-            async function chart_deaths() {
+            async function chart_deaths(min) {
                 console.log("loading file");
                 //grab data
                 var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
@@ -115,7 +119,7 @@
                     d.deaths = +d.deaths;
                 });
                 data = data.filter(function(d) {
-                    return (d.deaths > -1) && (d.deaths < 12000);
+                    return (d.deaths > min) && (d.deaths < 12000);
                 })
                 //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
                 //dimensions
@@ -185,7 +189,7 @@
                 svg.append("text").attr("x", margin.left + 150).attr("y", margin.top - 50).style("font-size", "17px").style("font-weight", "bold").text("Cases 7 Day Rolling Average");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.cases_avg))
-                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
             }
             async function deaths_average() {
@@ -222,10 +226,10 @@
                 svg.append("text").attr("x", margin.left + 150).attr("y", margin.top - 50).style("font-size", "17px").style("font-weight", "bold").text("Deaths 7 Day Rolling Average");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.deaths_avg))
-                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
             }
-            async function cases_deaths_ratio() {
+            async function cases_deaths_ratio(min) {
                 console.log("loading file");
                 //grab data
                 var data = await d3.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/rolling-averages/us.csv');
@@ -240,7 +244,7 @@
                     }
                 });
                 data = data.filter(function(d) {
-                    return ((d.deaths > 0) && (d.deaths < 12000)) && (d.cases > 0);
+                    return ((d.deaths > min) && (d.deaths < 12000)) && (d.cases > min);
                 })
                 //boiler plate line chart code courtesy of datavizdad: https://www.youtube.com/watch?v=g5bp02-CRAc
                 //dimensions
@@ -263,7 +267,7 @@
                 svg.append("text").attr("x", margin.left + 300).attr("y", margin.top - 100).style("font-size", "34px").style("font-weight", "bold").text("COVID Cases to Deaths Ratio Daily");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.ratio))
-                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "red").attr("stroke-width", 1).attr("d", line);
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
                 const type = d3.annotationLabel
                 const annotations = [{
@@ -311,10 +315,10 @@
                 //praying this axis label works
                 svg.append("text").text("Last 7 Day Average").attr("transform", "translate(-30, -15)");
                 //Chart name
-                svg.append("text").attr("x", margin.left + 150).attr("y", margin.top - 50).style("font-size", "17px").style("font-weight", "bold").text("Cases 7 Day Rolling Average");
+                svg.append("text").attr("x", margin.left + 150).attr("y", margin.top - 50).style("font-size", "17px").style("font-weight", "bold").text("Cases/Deaths 7 Day Rolling Average");
                 //line time!
                 const line = d3.line().x(d => x(d.date)).y(d => y(d.cases_deaths_avg))
-                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "purple").attr("stroke-width", 1).attr("d", line);
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "green").attr("stroke-width", 1).attr("d", line);
                 //d3.select("#demo").style("display", "none");
             }
             d3.select("#demoButton").on("click", function() {
@@ -346,7 +350,32 @@
                     }
                 }
             })
-            
+            d3.select("#min").on("click", function() {
+                var test;
+                while (true) {
+                    test = window.prompt("set a minumum threshold for data points. (enter a number > -1)");
+                    if (+test === NaN) {
+                        console.log("a non-number was entered")
+                    } else {
+                        if (+test < 0) {
+                            console.log("a valid number wasn't entered");
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                min = test;
+                d3.select("svg").selectAll('*').remove();
+                if (i === 0) {
+                    chart_cases(min);
+                }
+                if (i === 1) {
+                    chart_deaths(min);
+                }
+                if (i === 2) {
+                    cases_deaths_ratio(min);
+                }
+            })
         </script>
     </body>
 </html>
